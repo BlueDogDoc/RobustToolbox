@@ -9,6 +9,7 @@
     <PackageReference Include="YamlDotNet" />
     <PackageReference Include="Linguini.Bundle" />
     <PackageReference Include="Pidgin" />
+    <PackageReference Include="SixLabors.ImageSharp" />
     
     <PackageReference Include="JetBrains.Annotations"/>
     <PackageReference Include="Microsoft.NET.Test.Sdk"/>
