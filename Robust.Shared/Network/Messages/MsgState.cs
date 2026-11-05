@@ -38,6 +38,10 @@ namespace Robust.Shared.Network.Messages
             MsgSize = buffer.LengthBytes;
             var uncompressedLength = buffer.ReadVariableInt32();
             var compressedLength = buffer.ReadVariableInt32();
+            //DS-14 start
+            if (uncompressedLength < 0 || uncompressedLength > 20971520)
+                throw new InvalidOperationException($"Uncompressed size {uncompressedLength} is above 20971520.");
+            //DS-14 end
             MemoryStream finalStream;
 
             // State is compressed.
