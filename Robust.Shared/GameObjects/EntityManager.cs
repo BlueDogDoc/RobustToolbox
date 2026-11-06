@@ -831,6 +831,7 @@ namespace Robust.Shared.GameObjects
             // Attempt to flush entities a second time, just in case something somehow caused an entity to be spawned
             // while flushing entities
             FlushEntitiesInternal();
+            PurgeRemainingEntities(); // DS14
 #endif
 
             if (Entities.Count != 0)
@@ -838,6 +839,59 @@ namespace Robust.Shared.GameObjects
 
             AfterEntityFlush?.Invoke();
         }
+
+        // DS14-start
+        private void PurgeRemainingEntities()
+        {
+            foreach (var uid in Entities.ToArray())
+            {
+                if (!Entities.Contains(uid))
+                    continue;
+
+                if (MetaQuery.TryGetComponentInternal(uid, out var meta)
+                    && meta.EntityLifeStage == EntityLifeStage.Terminating)
+                {
+                    try
+                    {
+                        DeleteEntity(uid, meta, TransformQuery.GetComponent(uid));
+                    }
+                    catch (Exception e)
+                    {
+                        _sawmill.Log(LogLevel.Error, e,
+                            $"Caught exception while deleting entity stuck in termination {ToPrettyString(uid, meta)}");
+                    }
+
+                    if (!Entities.Contains(uid))
+                        continue;
+                }
+
+                _sawmill.Error($"Purging entity that survived flush: {ToPrettyString(uid)}");
+                PurgeEntity(uid);
+            }
+        }
+
+        private void PurgeEntity(EntityUid uid)
+        {
+            MetaQuery.TryGetComponentInternal(uid, out var meta);
+
+            foreach (var dict in _entTraitArray)
+            {
+                if (dict != null && dict.Remove(uid, out var comp))
+                    comp.LifeStage = ComponentLifeStage.Deleted;
+            }
+
+            _entCompIndex.Remove(uid);
+
+            if (meta != null)
+            {
+                NetEntityLookup.Remove(meta.NetEntity);
+                SetLifeStage(meta, EntityLifeStage.Deleted);
+            }
+
+            EventBusInternal.OnEntityDeleted(uid);
+            Entities.Remove(uid);
+        }
+        // DS14-end
 
         private void FlushEntitiesInternal()
         {
