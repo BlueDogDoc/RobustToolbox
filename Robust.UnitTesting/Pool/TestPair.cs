@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using Robust.Shared.Configuration;
@@ -38,6 +39,8 @@ public abstract partial class TestPair<TServer, TClient> : ITestPair, IAsyncDisp
 
     private int _nextServerSeed;
     private int _nextClientSeed;
+
+    private static readonly AsyncLocal<HashSet<TestPair<TServer, TClient>>> Checkout = new();
 
     public int ServerSeed { get; set; }
     public int ClientSeed { get; set; }
@@ -150,7 +153,25 @@ public abstract partial class TestPair<TServer, TClient> : ITestPair, IAsyncDisp
         if (State != PairState.Ready)
             throw new InvalidOperationException($"Pair is not ready to use. State: {State}");
 
+        var owned = Checkout.Value;
+        if (owned == null)
+        {
+            owned = new HashSet<TestPair<TServer, TClient>>();
+            Checkout.Value = owned;
+        }
+
+        owned.Add(this);
         State = PairState.InUse;
+    }
+
+    internal bool OwnsCheckout()
+    {
+        return Checkout.Value != null && Checkout.Value.Contains(this);
+    }
+
+    internal void ReleaseCheckout()
+    {
+        Checkout.Value?.Remove(this);
     }
 
     public async Task AddToHistory(string testName)
